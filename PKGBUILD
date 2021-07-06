@@ -57,8 +57,8 @@ _srcname=linux-${_major}
 pkgbase=linux-cacule-rdb-generic_v3
 #pkgver=${_major}.${_minor}
 pkgver=${_major}
-pkgrel=1
-pkgdesc='Linux-CacULE Kernel by Hamad Marri and with some other patchsets'
+pkgrel=4
+pkgdesc='Linux-CacULE-RDB Kernel by Hamad Marri and with some other patchsets'
 arch=('x86_64')
 url="https://github.com/hamadmarri/cacule-cpu-scheduler"
 license=('GPL2')
@@ -70,9 +70,10 @@ _caculepatches="https://raw.githubusercontent.com/ptr1337/linux-cacule-aur/maste
 source=(
   "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${_major}.tar.xz"
 #  "https://cdn.kernel.org/pub/linux/kernel/v5.x/patch-${pkgver}.xz"
-  "config"
+  "https://raw.githubusercontent.com/ptr1337/linux-cacule-aur/master/linux-cacule-rdb/config"
   "${_patchsource}/arch-patches/0001-ZEN-Add-sysctl-and-CONFIG-to-disallow-unprivileged-C.patch"
   "${_caculepatches}/v5.13/cacule-5.13.patch"
+  "${_caculepatches}/v5.13/rdb-5.13.patch"
   "${_patchsource}/cpu-patches/0001-cpu-patches.patch"
   "${_patchsource}/futex-patches/0001-futex-resync-from-gitlab.collabora.com.patch"
   "${_patchsource}/futex2/0007-v5.13-futex2_interface.patch"
@@ -85,9 +86,15 @@ source=(
   "${_patchsource}/bbr2-patches/0001-bbr2-5.13-introduce-BBRv2.patch"
   "${_patchsource}/btrfs-patches/0001-btrfs-patches.patch"
   "${_patchsource}/android-patches/0001-android-export-symbold-and-enable-building-ashmem-an.patch"
-  "${_patchsource}/pf-patches-v2/0001-pf-patches.patch"
+  "${_patchsource}/pf-patches-v3/0001-pf-patches.patch"
   "${_patchsource}/lru-patches/0001-lru-patches.patch"
   "${_patchsource}/ntfs3-patches/0001-ntfs3-patches.patch"
+  "${_patchsource}/security-2/hardened-patches.patch"
+  "${_patchsource}/security-2/lrng-v41.patch"
+  "${_patchsource}/misc/1000-tune-vm-mm-and-vfs-settings.patch"
+  "${_patchsource}/misc/rcu-fixes-next.patch"
+  "${_patchsource}/misc/nohzfull.patch"
+  "${_patchsource}/security-patches/0001-security-patches.patch"
   "${_patchsource}/zstd-upstream-patches/0001-zstd-upstream-patches.patch"
   "${_patchsource}/clearlinux-patches/0001-clearlinux-patches.patch"
   "${_patchsource}/ksm-patches/0001-ksm-patches.patch"
@@ -121,14 +128,13 @@ prepare() {
         patch -Np1 < "../$src"
     done
 
- ### Setting config
+      ### Setting config
         echo "Setting config..."
       cp "${srcdir}"/config .config
       make olddefconfig
-    ### CPU_ARCH SCRIPT ##
-    scripts/config --disable CONFIG_GENERIC_CPU
-    scripts/config --enable CONFIG_GENERIC_CPU3
-    
+      ### CPU_ARCH SCRIPT ##
+      scripts/config --disable CONFIG_GENERIC_CPU
+      scripts/config --enable CONFIG_GENERIC_CPU3
       ### Optionally set tickrate to 2000HZ
         if [ -n "$_2k_HZ_ticks" ]; then
           echo "Setting tick rate to 2k..."
@@ -231,14 +237,17 @@ prepare() {
       ### Enabling Cacule-Config ##
           echo "Enable CacULE CPU scheduler..."
           scripts/config --enable CONFIG_CACULE_SCHED
-          scripts/config --enable CONFIG_FAIR_GROUP_SCHED
-          scripts/config --enable CONFIG_SCHED_AUTOGROUP
+          scripts/config --enable CONFIG_CACULE_RDB
+          scripts/config --set-val CONFIG_RDB_INTERVAL 19
+          scripts/config --disable CONFIG_RDB_TASKS_GROUP
+          scripts/config --disable CONFIG_FAIR_GROUP_SCHED
+          scripts/config --disable CONFIG_SCHED_AUTOGROUP
           scripts/config --disable CONFIG_EXPERT
           scripts/config --disable CONFIG_SCHED_DEBUG
           scripts/config --disable CONFIG_SCHED_INFO
           scripts/config --disable CONFIG_SCHEDSTATS
           scripts/config --disable CONFIG_DEBUG_KERNEL
-          scripts/config --enable CONFIG_RT_GROUP_SCHED
+  #        scripts/config --disable CONFIG_RT_GROUP_SCHED
           echo "Enabling Full Tickless"
           scripts/config --disable CONFIG_HZ_PERIODIC
           scripts/config --disable CONFIG_NO_HZ_IDLE
@@ -283,64 +292,64 @@ prepare() {
           scripts/config --module CONFIG_VHBA
           scripts/config --disable CONFIG_GCC_PLUGINS
           # General Setup
-          scripts/config --disable CONFIG_BSD_PROCESS_ACCT
-          scripts/config --disable CONFIG_TASK_XACCT
-          scripts/config --enable CONFIG_PSI
-          scripts/config --disable CONFIG_MEMCG
-          scripts/config --enable CONFIG_CGROUP_CPUACCT
-          scripts/config --disable CONFIG_CGROUP_DEBUG
-          scripts/config --disable CONFIG_CHECKPOINT_RESTORE
-          scripts/config --disable CONFIG_SLAB_MERGE_DEFAULT
-          scripts/config --disable CONFIG_SLAB_FREELIST_HARDENED
-          scripts/config --disable CONFIG_SLUB_CPU_PARTIAL
-          scripts/config --disable CONFIG_PROFILING
+      scripts/config --disable CONFIG_BSD_PROCESS_ACCT
+      scripts/config --disable CONFIG_TASK_XACCT
+      scripts/config --enable CONFIG_PSI
+      scripts/config --disable CONFIG_MEMCG
+      scripts/config --enable CONFIG_CGROUP_CPUACCT
+      scripts/config --disable CONFIG_CGROUP_DEBUG
+      scripts/config --disable CONFIG_CHECKPOINT_RESTORE
+      scripts/config --disable CONFIG_SLAB_MERGE_DEFAULT
+      scripts/config --disable CONFIG_SLAB_FREELIST_HARDENED
+      scripts/config --disable CONFIG_SLUB_CPU_PARTIAL
+      scripts/config --disable CONFIG_PROFILING
 
-          # Processor type and features
-          scripts/config --disable CONFIG_X86_5LEVEL
-          scripts/config --disable CONFIG_KEXEC
-          scripts/config --disable CONFIG_KEXEC_FILE
-          scripts/config --disable CONFIG_CRASH_DUMPs
-          scripts/config --disable CONFIG_KPROBES
-          # Kernel hacking
-          scripts/config --disable CONFIG_FTRACE
-          scripts/config --disable CONFIG_DEBUG_KERNEL
-          scripts/config --disable CONFIG_PAGE_EXTENSION
-          scripts/config --set-val CONFIG_RCU_CPU_STALL_TIMEOUT 4
-          scripts/config --disable CONFIG_PRINTK_TIME
-          scripts/config --disable CONFIG_DEBUG_INFO
-          scripts/config --disable CONFIG_ENABLE_MUST_CHECK
-          scripts/config --disable CONFIG_STRIP_ASM_SYMS
-          scripts/config --disable CONFIG_UNUSED_SYMBOLS
-          scripts/config --disable CONFIG_DEBUG_FS
-          scripts/config --disable CONFIG_OPTIMIZE_INLINING
-          scripts/config --disable CONFIG_DEBUG_SECTION_MISMATCH
-          scripts/config --disable CONFIG_SECTION_MISMATCH_WARN_ONLY
-          scripts/config --disable CONFIG_STACK_VALIDATION
-          scripts/config --disable CONFIG_DEBUG_FORCE_WEAK_PER_CPU
-          scripts/config --disable CONFIG_MAGIC_SYSRQ
-          scripts/config --disable CONFIG_MAGIC_SYSRQ_SERIAL
-          scripts/config --disable CONFIG_PAGE_EXTENSION
-          scripts/config --disable CONFIG_DEBUG_PAGEALLOC
-          scripts/config --disable CONFIG_PAGE_OWNER
-          scripts/config --disable CONFIG_DEBUG_MEMORY_INIT
-          scripts/config --disable CONFIG_HARDLOCKUP_DETECTOR
-          scripts/config --disable CONFIG_SOFTLOCKUP_DETECTOR
-          scripts/config --disable CONFIG_DETECT_HUNG_TASK
-          scripts/config --disable CONFIG_WQ_WATCHDOG
-          scripts/config --set-val CONFIG_PANIC_TIMEOUT 10
-          scripts/config --disable CONFIG_SCHEDSTATS
-          scripts/config --disable CONFIG_SCHED_STACK_END_CHECK
-          scripts/config --disable CONFIG_STACKTRACE
-          scripts/config --disable CONFIG_DEBUG_BUGVERBOSE
-          scripts/config --disable CONFIG_RCU_TRACE
-          scripts/config --disable CONFIG_FAULT_INJECTION
-          scripts/config --disable CONFIG_LATENCYTOP
-          scripts/config --disable CONFIG_PROVIDE_OHCI1394_DMA_INIT
-          scripts/config --disable RUNTIME_TESTING_MENU
-          scripts/config --disable CONFIG_MEMTEST
-          scripts/config --disable CONFIG_KGDB
-          scripts/config --disable CONFIG_EARLY_PRINTK
-          scripts/config --disable CONFIG_DOUBLEFAULT
+      # Processor type and features
+      scripts/config --disable CONFIG_X86_5LEVEL
+      scripts/config --disable CONFIG_KEXEC
+      scripts/config --disable CONFIG_KEXEC_FILE
+      scripts/config --disable CONFIG_CRASH_DUMPs
+      scripts/config --disable CONFIG_KPROBES
+      # Kernel hacking
+      scripts/config --disable CONFIG_FTRACE
+      scripts/config --disable CONFIG_DEBUG_KERNEL
+      scripts/config --disable CONFIG_PAGE_EXTENSION
+      scripts/config --set-val CONFIG_RCU_CPU_STALL_TIMEOUT 4
+      scripts/config --disable CONFIG_PRINTK_TIME
+      scripts/config --disable CONFIG_DEBUG_INFO
+      scripts/config --disable CONFIG_ENABLE_MUST_CHECK
+      scripts/config --disable CONFIG_STRIP_ASM_SYMS
+      scripts/config --disable CONFIG_UNUSED_SYMBOLS
+      scripts/config --disable CONFIG_DEBUG_FS
+      scripts/config --disable CONFIG_OPTIMIZE_INLINING
+      scripts/config --disable CONFIG_DEBUG_SECTION_MISMATCH
+      scripts/config --disable CONFIG_SECTION_MISMATCH_WARN_ONLY
+      scripts/config --disable CONFIG_STACK_VALIDATION
+      scripts/config --disable CONFIG_DEBUG_FORCE_WEAK_PER_CPU
+      scripts/config --disable CONFIG_MAGIC_SYSRQ
+      scripts/config --disable CONFIG_MAGIC_SYSRQ_SERIAL
+      scripts/config --disable CONFIG_PAGE_EXTENSION
+      scripts/config --disable CONFIG_DEBUG_PAGEALLOC
+      scripts/config --disable CONFIG_PAGE_OWNER
+      scripts/config --disable CONFIG_DEBUG_MEMORY_INIT
+      scripts/config --disable CONFIG_HARDLOCKUP_DETECTOR
+      scripts/config --disable CONFIG_SOFTLOCKUP_DETECTOR
+      scripts/config --disable CONFIG_DETECT_HUNG_TASK
+      scripts/config --disable CONFIG_WQ_WATCHDOG
+      scripts/config --set-val CONFIG_PANIC_TIMEOUT 10
+      scripts/config --disable CONFIG_SCHEDSTATS
+      scripts/config --disable CONFIG_SCHED_STACK_END_CHECK
+      scripts/config --disable CONFIG_STACKTRACE
+      scripts/config --disable CONFIG_DEBUG_BUGVERBOSE
+      scripts/config --disable CONFIG_RCU_TRACE
+      scripts/config --disable CONFIG_FAULT_INJECTION
+      scripts/config --disable CONFIG_LATENCYTOP
+      scripts/config --disable CONFIG_PROVIDE_OHCI1394_DMA_INIT
+      scripts/config --disable RUNTIME_TESTING_MENU
+      scripts/config --disable CONFIG_MEMTEST
+      scripts/config --disable CONFIG_KGDB
+      scripts/config --disable CONFIG_EARLY_PRINTK
+      scripts/config --disable CONFIG_DOUBLEFAULT
 
 
     ### Optionally use running kernel's config
@@ -499,9 +508,10 @@ md5sums=('76c60fb304510a7bbd9c838790bc5fe4'
          'SKIP'
          '9bb46b8ce45259c238c5233b8394d70b'
          '8fab6f0acf86d138a283c4dd044198ed'
+         'efb4f07f10058ec12933ba3ea12aa983'
          '7640a753a7803248543675a6edc75e08'
          '85f4be6562ee033b83814353a12b61bd'
-         '004c2b38dfc71a279e625a7daeb4fa84'
+         '2c0375b3cc9690a0f0f3d3e49df54d10'
          '9573b92353399343db8a691c9b208300'
          '1217799f33d6ba822152a0e2fb6f2e34'
          '09a9e83b7b828fae46fd1a4f4cc23c28'
@@ -511,9 +521,15 @@ md5sums=('76c60fb304510a7bbd9c838790bc5fe4'
          '12cdc30bc3e2a17825b23b63bd6a5e7a'
          '63078800040b2a9a9f19c59c4ebf5b23'
          '81f27f12e20971c7d7fc3a53ffb6842c'
-         'ed551763bd8112d087bcd21782d68325'
+         'ed46a39e062f07693f52981fbd7350b7'
          '3f302dbaceea020abd40f6e9f23b75df'
          '86825a0c5716a1d9c6a39f9d3886b1bf'
+         '8b756f75c5600b1ea7df5e11ac738df5'
+         '20e92e9d958ca8fec6ff441bb97aa9f1'
+         '0632f49f076c90b6d6098cad7b5a88ac'
+         'eff4bb43a8defb7ed08b9c1e403291ea'
+         'c68e4fd9b4a55ee730a34bb39ae325ad'
+         '9977ba0e159416108217a45438ebebb4'
          '9e5114dba6da65e8d444aa225b109a21'
          'c360b8c17d778f98a54fa7cddf348566'
          'ce9beff503ee9e6ce6fd983c1bbbdd9e'
